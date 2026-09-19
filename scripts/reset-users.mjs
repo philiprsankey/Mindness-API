@@ -14,6 +14,8 @@ db.exec(`
   DELETE FROM moods;
   DELETE FROM gratitude_entries;
   DELETE FROM journal_entries;
+  DELETE FROM companion_check_in_cache;
+  DELETE FROM companion_memory;
   DELETE FROM auth_tokens;
   DELETE FROM users;
 `);
@@ -27,6 +29,8 @@ const tables = [
   'goal_completions',
   'gratitude_entries',
   'journal_entries',
+  'companion_memory',
+  'companion_check_in_cache',
   'auth_tokens',
 ];
 
