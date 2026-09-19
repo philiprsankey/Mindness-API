@@ -35,7 +35,7 @@ const TIER_FEATURES: Record<SubscriptionTier, SubscriptionFeatures> = {
     dailyMessageLimit: null,
     voice: true,
     premiumVoice: true,
-    animatedAvatar: true,
+    animatedAvatar: false,
     deepMemory: true,
     proactiveCheckIns: true,
     personalizedIntake: true,
