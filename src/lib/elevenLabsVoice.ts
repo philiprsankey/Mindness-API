@@ -7,7 +7,17 @@ export type ElevenLabsVoiceConfig = {
 };
 
 type PersonaGender = Persona['gender'];
-type PersonaOrigin = Persona['origin'];
+
+export type PersonaOrigin =
+  | 'british'
+  | 'american'
+  | 'australian'
+  | 'irish'
+  | 'scottish'
+  | 'canadian'
+  | 'new_zealand'
+  | 'south_african'
+  | 'indian';
 
 /**
  * Curated ElevenLabs premade voices — verified against GET /v1/voices.
@@ -48,6 +58,21 @@ const VOICE_MATRIX: Record<
     male: 'iP95p4xoKVk53GoZ742B', // Chris
     neutral: 'EXAVITQu4vr4xnSDxMaL',
   },
+  new_zealand: {
+    female: 'XrExE9yKIg1WjnnlVkGX', // Matilda (closest ANZ female)
+    male: 'IKne3meq5aSn9XLyUdCD', // Charlie (closest ANZ male)
+    neutral: 'IKne3meq5aSn9XLyUdCD',
+  },
+  south_african: {
+    female: 'EXAVITQu4vr4xnSDxMaL', // Sarah (clear neutral English; closest premade)
+    male: 'JBFqnCBsd6RMkjVDRZzb', // George (warm mature; closest premade)
+    neutral: 'EXAVITQu4vr4xnSDxMaL',
+  },
+  indian: {
+    female: 'hLvRzHEBXR9scnhmrX9E', // Riya Rao
+    male: 'SPnt7u3Gb2UpfIV1to5x', // Vikram S
+    neutral: 'hLvRzHEBXR9scnhmrX9E',
+  },
 };
 
 const FALLBACK_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Adam
@@ -82,6 +107,21 @@ const ENV_KEY: Record<PersonaOrigin, Record<PersonaGender, string>> = {
     female: 'ELEVENLABS_VOICE_CANADIAN_FEMALE',
     male: 'ELEVENLABS_VOICE_CANADIAN_MALE',
     neutral: 'ELEVENLABS_VOICE_CANADIAN_NEUTRAL',
+  },
+  new_zealand: {
+    female: 'ELEVENLABS_VOICE_NEW_ZEALAND_FEMALE',
+    male: 'ELEVENLABS_VOICE_NEW_ZEALAND_MALE',
+    neutral: 'ELEVENLABS_VOICE_NEW_ZEALAND_NEUTRAL',
+  },
+  south_african: {
+    female: 'ELEVENLABS_VOICE_SOUTH_AFRICAN_FEMALE',
+    male: 'ELEVENLABS_VOICE_SOUTH_AFRICAN_MALE',
+    neutral: 'ELEVENLABS_VOICE_SOUTH_AFRICAN_NEUTRAL',
+  },
+  indian: {
+    female: 'ELEVENLABS_VOICE_INDIAN_FEMALE',
+    male: 'ELEVENLABS_VOICE_INDIAN_MALE',
+    neutral: 'ELEVENLABS_VOICE_INDIAN_NEUTRAL',
   },
 };
 
