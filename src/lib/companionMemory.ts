@@ -103,6 +103,10 @@ Merge new facts into the profile. Use only these sections when they have content
 ## Work & life stressors
 ## Patterns & preferences
 
+Relationships section:
+- Capture names and roles when the user shares them (e.g. daughter: Emma, partner: James, dog: Max).
+- If they mention a role without a name (e.g. "my daughter"), note the relationship even without a name until they share one.
+
 Rules:
 - Add new facts, update changed ones, remove outdated ones
 - Never include what the companion said — only facts about the user
