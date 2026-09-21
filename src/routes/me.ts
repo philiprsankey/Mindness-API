@@ -1,6 +1,7 @@
 import type { Request } from 'express';
 import { Router } from 'express';
 import {
+  deleteUserAccount,
   ensureUser,
   getUser,
   markCompanionWelcomeSeen,
@@ -283,5 +284,43 @@ meRouter.delete('/me/memory', (req, res) => {
   }
 
   eraseMemory(userId);
+  res.sendStatus(204);
+});
+
+meRouter.delete('/me', async (req, res) => {
+  const userId = getUserId(req);
+  const user = getUser(userId);
+
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  if (user.passwordHash) {
+    const currentPassword =
+      typeof req.body?.currentPassword === 'string' ? req.body.currentPassword : '';
+    if (!currentPassword) {
+      res.status(400).json({ error: 'Current password is required to delete your account' });
+      return;
+    }
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+  } else {
+    const confirmed = req.body?.confirm === true;
+    if (!confirmed) {
+      res.status(400).json({ error: 'Account deletion must be confirmed' });
+      return;
+    }
+  }
+
+  const deleted = deleteUserAccount(userId);
+  if (!deleted) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
   res.sendStatus(204);
 });

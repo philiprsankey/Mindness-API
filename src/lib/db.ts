@@ -1077,6 +1077,30 @@ export function revokeAllRefreshTokens(userId: string): void {
   db.prepare(`DELETE FROM auth_tokens WHERE user_id = ? AND type = 'refresh'`).run(userId);
 }
 
+/** Permanently removes the user and all associated wellness data. */
+export function deleteUserAccount(userId: string): boolean {
+  const user = getUser(userId);
+  if (!user) return false;
+
+  const run = db.transaction(() => {
+    db.prepare(`DELETE FROM conversations WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM moods WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM goals WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM gratitude_entries WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM journal_entries WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM companion_check_in_cache WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM companion_memory WHERE user_id = ?`).run(userId);
+    db.prepare(`DELETE FROM auth_tokens WHERE user_id = ?`).run(userId);
+    if (user.email) {
+      db.prepare(`DELETE FROM auth_tokens WHERE lower(email) = lower(?)`).run(user.email);
+    }
+    db.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
+  });
+
+  run();
+  return true;
+}
+
 export function linkGoogleId(userId: string, googleId: string): void {
   db.prepare(
     `UPDATE users
