@@ -3,7 +3,9 @@ import { Router } from 'express';
 import {
   deleteUserAccount,
   ensureUser,
+  findUserIdByAppleTransaction,
   getUser,
+  saveAppleSubscription,
   markCompanionWelcomeSeen,
   markUserOnboarded,
   normalizePersonaAvatar,
@@ -25,6 +27,7 @@ import {
   stripIntakeBlock,
 } from '../lib/intake';
 import { hashPassword, verifyPassword } from '../lib/password';
+import { verifyAppleSubscription } from '../lib/appleSubscription';
 import {
   getEffectiveSubscriptionTier,
   getTierFeatures,
@@ -76,6 +79,47 @@ meRouter.get('/me', (req, res) => {
       : null,
     displayName: resolveIntakeDisplayName(intakeProfile, user.firstName),
   });
+});
+
+meRouter.post('/me/subscription/apple', async (req, res) => {
+  const signedTransaction = (req.body as { signedTransaction?: unknown } | undefined)
+    ?.signedTransaction;
+
+  if (typeof signedTransaction !== 'string' || signedTransaction.split('.').length !== 3) {
+    res.status(400).json({ error: 'Missing Apple transaction' });
+    return;
+  }
+
+  try {
+    const verified = await verifyAppleSubscription(signedTransaction);
+    const userId = getUserId(req);
+
+    if (
+      verified.appAccountToken &&
+      verified.appAccountToken.toLowerCase() !== userId.toLowerCase()
+    ) {
+      res.status(403).json({ error: 'This purchase belongs to a different Mindness account' });
+      return;
+    }
+
+    const ownerId = findUserIdByAppleTransaction(verified.originalTransactionId);
+    if (ownerId && ownerId !== userId) {
+      res.status(409).json({ error: 'This subscription is already linked to another account' });
+      return;
+    }
+
+    const user = saveAppleSubscription(userId, verified);
+    res.json({
+      subscriptionTier: getEffectiveSubscriptionTier(user),
+      subscriptionExpiresAt: user.subscriptionExpiresAt,
+    });
+  } catch (error) {
+    console.error(
+      '[subscription] Apple verification failed',
+      error instanceof Error ? error.message : error,
+    );
+    res.status(400).json({ error: 'Apple could not confirm this subscription' });
+  }
 });
 
 meRouter.put('/me/persona', (req, res) => {

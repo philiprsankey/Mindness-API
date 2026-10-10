@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import path from 'path';
 import { computeGoalStats } from './goalStats';
-import { parseSubscriptionTier, type SubscriptionTier } from './subscription';
+import { parseSubscriptionTier, tierRank, type SubscriptionTier } from './subscription';
 
 export type ConversationRow = {
   id: number;
@@ -40,6 +40,9 @@ export type UserRow = {
   googleId: string | null;
   authProvider: 'email' | 'google';
   subscriptionTier: SubscriptionTier;
+  subscriptionProductId: string | null;
+  subscriptionOriginalTransactionId: string | null;
+  subscriptionExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -229,6 +232,20 @@ function runMigrations(): void {
   if (!columnExists('users', 'companion_welcome_seen')) {
     db.exec(`ALTER TABLE users ADD COLUMN companion_welcome_seen INTEGER NOT NULL DEFAULT 0`);
   }
+  if (!columnExists('users', 'subscription_product_id')) {
+    db.exec(`ALTER TABLE users ADD COLUMN subscription_product_id TEXT`);
+  }
+  if (!columnExists('users', 'subscription_original_transaction_id')) {
+    db.exec(`ALTER TABLE users ADD COLUMN subscription_original_transaction_id TEXT`);
+  }
+  if (!columnExists('users', 'subscription_expires_at')) {
+    db.exec(`ALTER TABLE users ADD COLUMN subscription_expires_at TEXT`);
+  }
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_original_transaction
+     ON users(subscription_original_transaction_id)
+     WHERE subscription_original_transaction_id IS NOT NULL`,
+  );
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -289,6 +306,10 @@ function mapUserRow(row: Record<string, unknown>): UserRow {
     googleId: (row.google_id as string | null) ?? null,
     authProvider: ((row.auth_provider as string | undefined) ?? 'email') as 'email' | 'google',
     subscriptionTier: parseSubscriptionTier(row.subscription_tier),
+    subscriptionProductId: (row.subscription_product_id as string | null) ?? null,
+    subscriptionOriginalTransactionId:
+      (row.subscription_original_transaction_id as string | null) ?? null,
+    subscriptionExpiresAt: (row.subscription_expires_at as string | null) ?? null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -361,7 +382,9 @@ export function getUser(userId: string): UserRow | null {
     .prepare(
       `SELECT id, email, first_name, persona_json, intake_json, companion_welcome_seen,
               onboarded, password_hash, email_verified_at, google_id, auth_provider,
-              subscription_tier, created_at, updated_at
+              subscription_tier, subscription_product_id,
+              subscription_original_transaction_id, subscription_expires_at,
+              created_at, updated_at
        FROM users WHERE id = ?`,
     )
     .get(userId) as Record<string, unknown> | undefined;
@@ -373,7 +396,9 @@ export function getUserByEmail(email: string): UserRow | null {
     .prepare(
       `SELECT id, email, first_name, persona_json, intake_json, companion_welcome_seen,
               onboarded, password_hash, email_verified_at, google_id, auth_provider,
-              subscription_tier, created_at, updated_at
+              subscription_tier, subscription_product_id,
+              subscription_original_transaction_id, subscription_expires_at,
+              created_at, updated_at
        FROM users WHERE lower(email) = lower(?)`,
     )
     .get(email.trim()) as Record<string, unknown> | undefined;
@@ -385,7 +410,9 @@ export function getUserByGoogleId(googleId: string): UserRow | null {
     .prepare(
       `SELECT id, email, first_name, persona_json, intake_json, companion_welcome_seen,
               onboarded, password_hash, email_verified_at, google_id, auth_provider,
-              subscription_tier, created_at, updated_at
+              subscription_tier, subscription_product_id,
+              subscription_original_transaction_id, subscription_expires_at,
+              created_at, updated_at
        FROM users WHERE google_id = ?`,
     )
     .get(googleId) as Record<string, unknown> | undefined;
@@ -428,6 +455,60 @@ export function updateUserPassword(userId: string, passwordHash: string): void {
   db.prepare(
     `UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
   ).run(passwordHash, userId);
+}
+
+export function findUserIdByAppleTransaction(originalTransactionId: string): string | null {
+  const row = db
+    .prepare(
+      `SELECT id FROM users WHERE subscription_original_transaction_id = ?`,
+    )
+    .get(originalTransactionId) as { id: string } | undefined;
+  return row?.id ?? null;
+}
+
+export function saveAppleSubscription(
+  userId: string,
+  input: {
+    tier: SubscriptionTier;
+    productId: string;
+    originalTransactionId: string;
+    expiresAt: string;
+  },
+): UserRow {
+  ensureUser(userId);
+  const current = getUser(userId)!;
+  const currentExpiry = current.subscriptionExpiresAt
+    ? Date.parse(current.subscriptionExpiresAt)
+    : 0;
+  const nextExpiry = Date.parse(input.expiresAt);
+
+  if (
+    Number.isFinite(currentExpiry) &&
+    Number.isFinite(nextExpiry) &&
+    (nextExpiry < currentExpiry ||
+      (nextExpiry === currentExpiry &&
+        tierRank(input.tier) < tierRank(current.subscriptionTier)))
+  ) {
+    return current;
+  }
+
+  db.prepare(
+    `UPDATE users
+     SET subscription_tier = ?,
+         subscription_product_id = ?,
+         subscription_original_transaction_id = ?,
+         subscription_expires_at = ?,
+         updated_at = datetime('now')
+     WHERE id = ?`,
+  ).run(
+    input.tier,
+    input.productId,
+    input.originalTransactionId,
+    input.expiresAt,
+    userId,
+  );
+
+  return getUser(userId)!;
 }
 
 export function saveUserPersona(

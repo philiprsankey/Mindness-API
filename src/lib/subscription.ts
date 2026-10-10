@@ -63,12 +63,53 @@ export function resolveDevSubscriptionOverride(): SubscriptionTier | null {
   return null;
 }
 
+export const APPLE_SUBSCRIPTION_PRODUCTS = {
+  companion: 'com.mindness.app.companion.monthly',
+  companion_plus: 'com.mindness.app.companionplus.monthly',
+} as const;
+
+export function tierForAppleProductId(
+  productId: string,
+): Exclude<SubscriptionTier, 'free'> | null {
+  if (productId === APPLE_SUBSCRIPTION_PRODUCTS.companion) return 'companion';
+  if (productId === APPLE_SUBSCRIPTION_PRODUCTS.companion_plus) return 'companion_plus';
+  return null;
+}
+
+export function tierRank(tier: SubscriptionTier): number {
+  switch (tier) {
+    case 'companion_plus':
+      return 2;
+    case 'companion':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 export function getStoredSubscriptionTier(user: UserRow): SubscriptionTier {
   return parseSubscriptionTier(user.subscriptionTier);
 }
 
+export function isStoreSubscriptionActive(user: UserRow): boolean {
+  if (!user.subscriptionProductId || !user.subscriptionExpiresAt) return false;
+  const expiresAt = Date.parse(user.subscriptionExpiresAt);
+  return Number.isFinite(expiresAt) && expiresAt > Date.now();
+}
+
 export function getEffectiveSubscriptionTier(user: UserRow): SubscriptionTier {
-  return resolveDevSubscriptionOverride() ?? getStoredSubscriptionTier(user);
+  if (isStoreSubscriptionActive(user)) {
+    return getStoredSubscriptionTier(user);
+  }
+
+  const override = resolveDevSubscriptionOverride();
+  if (override) return override;
+
+  if (!user.subscriptionExpiresAt) {
+    return getStoredSubscriptionTier(user);
+  }
+
+  return 'free';
 }
 
 export function getTierFeatures(tier: SubscriptionTier): SubscriptionFeatures {
